@@ -37,7 +37,6 @@ docker run \
         -e no_proxy \
         ${GUI_ENV} \
         -v ${HERE}/..:/home/developer/${BASE} \
-        -v ${HERE}/../.local:/home/developer/.local \
         ${DIMG} \
           --workdir=/home/developer/${BASE} \
           --id $(id -u):$(id -g) \
