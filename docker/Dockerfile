@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND="noninteractive"
 ENV PKGS="sudo vim curl wget git zip unzip python3"
 
 RUN apt-get update && \
-    apt-get install -y ${PKGS} && \
+    apt-get install --no-install-recommends -y ${PKGS} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /tmp/*  && \
