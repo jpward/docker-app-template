@@ -36,7 +36,7 @@ fi
 docker run \
         --privileged \
         --rm \
-        -ti \
+        -t $(if tty -s; then printf -- "-i"; fi) \
         -e http_proxy \
         -e https_proxy \
         -e no_proxy \
