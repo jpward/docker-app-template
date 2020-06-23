@@ -28,6 +28,11 @@ BASE="`cat ${HERE}/BUILDER | cut -d':' -f1`"
 VER="`cat ${HERE}/BUILDER | cut -d':' -f2`"
 DIMG="$(docker images | grep ${BASE,,} | head -1 | awk '{print $1":"$2}')"
 
+ARGS=/bin/bash
+if [ $# -gt 0 ]; then
+  ARGS=$@
+fi
+
 docker run \
         --privileged \
         --rm \
@@ -41,6 +46,6 @@ docker run \
           --workdir=/home/developer/${BASE} \
           --id $(id -u):$(id -g) \
           ${ADD_GROUPS} \
-          --cmd '/bin/bash'
+          --cmd "/bin/bash -c '${ARGS}'"
 
 rm -f ${XAUTH}
