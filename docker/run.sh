@@ -2,6 +2,16 @@
 
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
+#Determine if we are running in background
+#  Derived from https://unix.stackexchange.com/questions/118462/how-can-a-bash-script-detect-if-it-is-running-in-the-background
+PROC=`cat /proc/$$/stat`
+BG=false
+if ! [ `echo $PROC | cut -d' ' -f4` = `echo $PROC | cut -d' ' -f8` ]; then BG=true; fi
+
+#Determine ARCH
+MY_ARCH=`uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/'`                                           
+ARCH=${ARCH:-${MY_ARCH}} 
+
 #Build container requirements
 #--id                   UID:GID of input user, if not specified 1000:1000 will be used
 #--workdir              Workdir to use, default /home/developer
@@ -24,7 +34,7 @@ ADD_GROUP_DOCKER=$(if [ -n "${DOCKER_GID}" ]; then USER_ARG="docker:${DOCKER_GID
 COMBINE_GROUPS="${ADD_GROUP_DOCKER} ${ADD_GROUP_LIBVIRTD}"
 ADD_GROUPS=$(if [ -n "`echo ${COMBINE_GROUPS} | sed 's/ //g'`" ]; then USER_ARG="--groupadd=${COMBINE_GROUPS}"; fi; echo "$USER_ARG" | sed 's/\(.\) \(.\)/\1,\2/g' )
 
-BASE="`cat ${HERE}/BUILDER | cut -d':' -f1`"
+BASE="`cat ${HERE}/BUILDER | cut -d':' -f1`-${ARCH}"
 VER="`cat ${HERE}/BUILDER | cut -d':' -f2`"
 DIMG="$(docker images | grep ${BASE,,} | head -1 | awk '{print $1":"$2}')"
 
@@ -36,7 +46,7 @@ fi
 docker run \
         --privileged \
         --rm \
-        -t $(if tty -s; then printf -- "-i"; fi) \
+        -t $(if tty -s && ! ${BG}; then printf -- "-i"; fi) \
         -e http_proxy \
         -e https_proxy \
         -e no_proxy \
