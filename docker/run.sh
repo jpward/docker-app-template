@@ -18,14 +18,25 @@ ARCH=${ARCH:-${MY_ARCH}}
 #--cmd                  Command to run after user is setup
 
 #Variables for using GUI from docker, including X11 forwarding (TODO: there are more secure ways of doing this)
-GUI_ENV="-p 22222:22222"
+GUI_ENV="--net host"
 if [ -n "${DISPLAY}" ]; then
-  xhost +local:root
-  XAUTH=/tmp/.docker.xauth.$RANDOM
-  touch ${XAUTH}
-  xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH} nmerge -
-  chmod 777 ${XAUTH}
-  GUI_ENV="--net host -e DISPLAY -e XAUTHORITY=${XAUTH} -v /tmp/.X11-unix:/tmp/.X11-unix -v ${XAUTH}:${XAUTH}"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    #GUI X11 forwarding for macos
+    if ( pgrep -f 'socat TCP-LISTEN:6000' ); then
+      echo "socat X11 connection already up, skipping..."
+    else
+      socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" &
+      SOCAT_PID=$!
+    fi
+    GUI_ENV="${GUI_ENV} -e DISPLAY=$(ifconfig en0 | grep -o "inet [0-9]*\.[0-9]*\.[0-9]*\.[0-9]* " | sed -e 's/inet //g' | sed 's/ //g'):0"
+  else
+    xhost +local:root
+    XAUTH=/tmp/.docker.xauth.$RANDOM
+    touch ${XAUTH}
+    xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH} nmerge -
+    chmod 777 ${XAUTH}
+    GUI_ENV="--net host -e DISPLAY -e XAUTHORITY=${XAUTH} -v /tmp/.X11-unix:/tmp/.X11-unix -v ${XAUTH}:${XAUTH}"
+  fi
 fi
 
 #Variables to add additional groups
@@ -36,13 +47,20 @@ ADD_GROUPS=$(if [ -n "`echo ${COMBINE_GROUPS} | sed 's/ //g'`" ]; then USER_ARG=
 
 BASE="`cat ${HERE}/BUILDER | cut -d':' -f1`-${ARCH}"
 VER="`cat ${HERE}/BUILDER | cut -d':' -f2`"
-DIMG="$(docker images | grep ${BASE,,} | head -1 | awk '{print $1":"$2}')"
+DIMG="$(docker images | grep $(echo ${BASE} | tr 'A-Z' 'a-z') | head -1 | awk '{print $1":"$2}')"
 
 ARGS=/bin/bash
 if [ $# -gt 0 ]; then
   ARGS=$@
 fi
 
+#Enable docker in docker
+DIND="-v /var/run/docker.sock:/var/run/docker.sock -v /var/run/docker.pid:/var/run/docker.pid"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  DIND="-v /var/run/docker.sock.raw:/var/run/docker.sock"
+fi
+
+#Add ${DIND} to docker run args below if docker in docker is desired
 docker run \
         --privileged \
         --rm \
